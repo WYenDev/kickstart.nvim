@@ -1,90 +1,91 @@
 return {
   'yetone/avante.nvim',
-  -- if you want to build from source then do `make BUILD_FROM_SOURCE=true`
-  -- ⚠️ must add this setting! ! !
-  build = vim.fn.has 'win32' ~= 0 and 'powershell -ExecutionPolicy Bypass -File Build.ps1 -BuildFromSource false' or 'make',
   event = 'VeryLazy',
-  version = false, -- Never set this value to "*"! Never!
+  lazy = false, -- Required for Avante to load its UI and commands properly
+  version = false,
+  -- Safest build command for cross-platform compatibility
+  build = vim.fn.has 'win32' == 1 and 'powershell -ExecutionPolicy Bypass -File Build.ps1 -BuildFromSource false' or 'make',
+
   ---@module 'avante'
   ---@type avante.Config
   opts = {
-    -- add any opts here
-    -- this file can contain specific instructions for your project
     instructions_file = 'avante.md',
-    -- for example
-    provider = 'deepseek_chat', -- DeepSeek Chat is now the default!
+    behaviour = {
+      auto_apply_diff_after_generation = false,
+      auto_approve_tool_permissions = false,
+    },
+
+    input = {
+      provider = 'snacks',
+    },
+    provider = 'deepseek_chat',
+
     providers = {
-      claude = {
-        endpoint = 'https://api.anthropic.com',
-        model = 'claude-sonnet-4-20250514',
-        timeout = 30000, -- Timeout in milliseconds
-        extra_request_body = {
-          temperature = 0.75,
-          max_tokens = 20480,
-        },
-      },
       deepseek_chat = {
-        endpoint = 'https://api.deepseek.com/v1',
+        __inherited_from = 'openai',
+        endpoint = 'https://api.deepseek.com',
         model = 'deepseek-chat',
         timeout = 30000,
-        api_key = os.getenv 'DEEPSEEK_API_KEY', -- Recommended: use env variable
+        api_key_name = 'DEEPSEEK_API_KEY', -- FIXED: Dynamically loads the key to prevent nil errors
         extra_request_body = {
           temperature = 0.75,
-          max_tokens = 32768,
+          max_tokens = 8192, -- FIXED: Adjusted to standard output limits
         },
       },
       deepseek_reasoner = {
-        endpoint = 'https://api.deepseek.com/v1',
+        __inherited_from = 'openai',
+        endpoint = 'https://api.deepseek.com',
         model = 'deepseek-reasoner',
         timeout = 30000,
-        api_key = os.getenv 'DEEPSEEK_API_KEY', -- Recommended: use env variable
+        api_key_name = 'DEEPSEEK_API_KEY', -- FIXED: Dynamically loads the key
         extra_request_body = {
           temperature = 0.75,
-          max_tokens = 32768,
+          max_tokens = 8192,
         },
       },
       moonshot = {
-        endpoint = 'https://api.moonshot.ai/v1',
+        __inherited_from = 'openai',
+        endpoint = 'https://api.moonshot.ai', -- FIXED: Removed /v1 since openai inheritance auto-appends paths
         model = 'kimi-k2-0711-preview',
-        timeout = 30000, -- Timeout in milliseconds
+        timeout = 30000,
+        api_key_name = 'MOONSHOT_API_KEY', -- Best practice: load dynamically
         extra_request_body = {
           temperature = 0.75,
-          max_tokens = 32768,
+          max_tokens = 8192,
         },
       },
     },
   },
+
   dependencies = {
     'nvim-lua/plenary.nvim',
     'MunifTanjim/nui.nvim',
-    --- The below dependencies are optional,
-    'nvim-mini/mini.pick', -- for file_selector provider mini.pick
-    'nvim-telescope/telescope.nvim', -- for file_selector provider telescope
-    'hrsh7th/nvim-cmp', -- autocompletion for avante commands and mentions
-    'ibhagwan/fzf-lua', -- for file_selector provider fzf
-    'stevearc/dressing.nvim', -- for input provider dressing
-    'folke/snacks.nvim', -- for input provider snacks
-    'nvim-tree/nvim-web-devicons', -- or echasnovski/mini.icons
-    'zbirenbaum/copilot.lua', -- for providers='copilot'
+    --- Optional dependencies
+    'nvim-mini/mini.pick',
+    'nvim-telescope/telescope.nvim',
+    'hrsh7th/nvim-cmp',
+    'ibhagwan/fzf-lua',
+    'stevearc/dressing.nvim',
+    'folke/snacks.nvim',
+    'nvim-tree/nvim-web-devicons',
+    'zbirenbaum/copilot.lua',
     {
-      -- support for image pasting
+      -- Support for image pasting
       'HakonHarnes/img-clip.nvim',
       event = 'VeryLazy',
       opts = {
-        -- recommended settings
         default = {
           embed_image_as_base64 = false,
           prompt_for_file_name = false,
           drag_and_drop = {
             insert_mode = true,
           },
-          -- required for Windows users
           use_absolute_path = true,
         },
       },
     },
     {
-      -- Make sure to set this up properly if you have lazy=true
+      -- Markdown rendering for Avante UI
       'MeanderingProgrammer/render-markdown.nvim',
       opts = {
         file_types = { 'markdown', 'Avante' },
