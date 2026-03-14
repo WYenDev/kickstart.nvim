@@ -1,34 +1,18 @@
--- debug.lua
---
--- Shows how to use the DAP plugin to debug your code.
---
--- Primarily focused on configuring the debugger for Go, but can
--- be extended to other languages as well. That's why it's called
--- kickstart.nvim and not kitchen-sink.nvim ;)
-
+-- ~/.config/nvim/lua/kickstart/plugins/debug.lua
 return {
-  -- NOTE: Yes, you can install new plugins here!
   'mfussenegger/nvim-dap',
-  -- NOTE: And you can specify dependencies as well
   dependencies = {
-    -- Creates a beautiful debugger UI
     'rcarriga/nvim-dap-ui',
-
-    -- Required dependency for nvim-dap-ui
     'nvim-neotest/nvim-nio',
-
-    -- Installs the debug adapters for you
     'williamboman/mason.nvim',
     'jay-babu/mason-nvim-dap.nvim',
-
-    -- Add your own debuggers here
     'leoluz/nvim-dap-go',
+    -- REMOVED: 'mxsdev/nvim-dap-vscode-js', -- This plugin was causing the error
   },
   keys = function(_, keys)
     local dap = require 'dap'
     local dapui = require 'dapui'
     return {
-      -- Basic debugging keymaps, feel free to change to your liking!
       { '<F5>', dap.continue, desc = 'Debug: Start/Continue' },
       { '<F1>', dap.step_into, desc = 'Debug: Step Into' },
       { '<F2>', dap.step_over, desc = 'Debug: Step Over' },
@@ -41,8 +25,7 @@ return {
         end,
         desc = 'Debug: Set Breakpoint',
       },
-      -- Toggle to see last session result. Without this, you can't see session output in case of unhandled exception.
-      { '<F7>', dapui.toggle, desc = 'Debug: See last session result.' },
+      { '<F7>', dapui.toggle, desc = 'Debug: Toggle Debug UI' },
       unpack(keys),
     }
   end,
@@ -50,29 +33,18 @@ return {
     local dap = require 'dap'
     local dapui = require 'dapui'
 
+    -- Mason DAP setup
     require('mason-nvim-dap').setup {
-      -- Makes a best effort to setup the various debuggers with
-      -- reasonable debug configurations
       automatic_installation = true,
-
-      -- You can provide additional configuration to the handlers,
-      -- see mason-nvim-dap README for more information
       handlers = {},
-
-      -- You'll need to check that you have the required things installed
-      -- online, please don't ask me how to install them :)
       ensure_installed = {
-        -- Update this to ensure that you have the debuggers for the langs you want
-        'delve',
+        'delve', -- Go debugger
+        'js-debug-adapter', -- JS debugger
       },
     }
 
     -- Dap UI setup
-    -- For more information, see |:help nvim-dap-ui|
     dapui.setup {
-      -- Set icons to characters that are more likely to work in every terminal.
-      --    Feel free to remove or use ones that you like more! :)
-      --    Don't feel like these are good choices.
       icons = { expanded = '▾', collapsed = '▸', current_frame = '*' },
       controls = {
         icons = {
@@ -89,17 +61,129 @@ return {
       },
     }
 
+    -- Auto open/close UI
     dap.listeners.after.event_initialized['dapui_config'] = dapui.open
     dap.listeners.before.event_terminated['dapui_config'] = dapui.close
     dap.listeners.before.event_exited['dapui_config'] = dapui.close
 
-    -- Install golang specific config
+    -- Go debugger setup
     require('dap-go').setup {
       delve = {
-        -- On Windows delve must be run attached or it crashes.
-        -- See https://github.com/leoluz/nvim-dap-go/blob/main/README.md#configuring
+        -- On Windows delve must be run attached
         detached = vim.fn.has 'win32' == 0,
       },
     }
+
+    -- ============================================
+    -- JavaScript / TypeScript debugger setup
+    -- DIRECT ADAPTER CONFIGURATION (No plugin needed)
+    -- ============================================
+    local mason_path = vim.fn.stdpath 'data' .. '/mason/packages/js-debug-adapter'
+    local dap_js_debug_path = mason_path .. '/js-debug/src/dapDebugServer.js'
+
+    -- Check if the debugger exists
+    if vim.fn.filereadable(dap_js_debug_path) == 1 then
+      -- Configure the pwa-node adapter (works for Node.js)
+      dap.adapters['pwa-node'] = {
+        type = 'server',
+        host = 'localhost',
+        port = '${port}',
+        executable = {
+          command = 'node',
+          args = { dap_js_debug_path, '${port}' },
+        },
+      }
+
+      dap.defaults.fallback.timeout = 20000
+
+      -- Chrome/Edge use the same adapter
+      dap.adapters['pwa-chrome'] = dap.adapters['pwa-node']
+      dap.adapters['pwa-msedge'] = dap.adapters['pwa-node']
+      dap.adapters['node-terminal'] = dap.adapters['pwa-node']
+
+      -- Define configurations for JavaScript/TypeScript files
+      for _, language in ipairs { 'typescript', 'javascript', 'javascriptreact', 'typescriptreact' } do
+        dap.configurations[language] = {
+          -- Node.js debug configurations
+          {
+            type = 'pwa-node',
+            request = 'launch',
+            name = '1. Launch Current File',
+            program = '${file}',
+            cwd = '${workspaceFolder}',
+            sourceMaps = true,
+            resolveSourceMapLocations = {
+              '${workspaceFolder}/**',
+              '!**/node_modules/**',
+            },
+          },
+          {
+            type = 'pwa-node',
+            request = 'launch',
+            name = '2. Launch with ts-node',
+            program = '${file}',
+            cwd = '${workspaceFolder}',
+            runtimeArgs = { '--require', 'ts-node/register/transpile-only' },
+            sourceMaps = true,
+            resolveSourceMapLocations = {
+              '${workspaceFolder}/**',
+              '!**/node_modules/**',
+            },
+          },
+          {
+            type = 'pwa-node',
+            request = 'launch',
+            name = '3. Launch npm script',
+            cwd = '${workspaceFolder}',
+            runtimeExecutable = 'npm',
+            runtimeArgs = { 'run', 'debug' },
+            console = 'integratedTerminal',
+          },
+          {
+            type = 'pwa-node',
+            request = 'attach',
+            name = '4. Attach to Process',
+            processId = require('dap.utils').pick_process,
+            cwd = '${workspaceFolder}',
+            sourceMaps = true,
+            resolveSourceMapLocations = {
+              '${workspaceFolder}/**',
+              '!**/node_modules/**',
+            },
+          },
+          -- Chrome debug configurations
+          {
+            type = 'pwa-chrome',
+            request = 'launch',
+            name = '5. Launch Chrome against localhost',
+            url = 'http://localhost:3000',
+            webRoot = '${workspaceFolder}',
+            userDataDir = '${workspaceFolder}/.vscode/vscode-chrome-debug-userdatadir',
+            sourceMaps = true,
+          },
+          {
+            type = 'pwa-chrome',
+            request = 'attach',
+            name = '6. Attach to Chrome',
+            port = 9222,
+            webRoot = '${workspaceFolder}',
+            sourceMaps = true,
+          },
+        }
+      end
+
+      -- Optional: Add React Native configuration if needed
+      -- dap.configurations.typescriptreact[#dap.configurations.typescriptreact + 1] = {
+      --   type = 'pwa-chrome',
+      --   request = 'launch',
+      --   name = 'Launch React Native Chrome',
+      --   url = 'http://localhost:8081/debugger-ui',
+      --   webRoot = '${workspaceFolder}',
+      -- }
+
+      vim.notify('JS debugger configured successfully!', vim.log.levels.INFO)
+    else
+      vim.notify('js-debug-adapter not found at: ' .. dap_js_debug_path .. '\nRun :MasonInstall js-debug-adapter', vim.log.levels.WARN)
+    end
   end,
 }
