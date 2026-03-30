@@ -7,6 +7,9 @@ return {
       local lint = require 'lint'
       lint.linters_by_ft = {
         markdown = { 'markdownlint' },
+        -- javascriptreact = { 'eslint' },
+        --  typescript = { 'eslint' },
+        --  typescriptreact = { 'eslint' },
       }
 
       -- To allow other plugins to add linters to require('lint').linters_by_ft,
@@ -44,7 +47,7 @@ return {
       -- Create autocommand which carries out the actual linting
       -- on the specified events.
       local lint_augroup = vim.api.nvim_create_augroup('lint', { clear = true })
-      vim.api.nvim_create_autocmd({ 'BufEnter', 'BufWritePost', 'InsertLeave' }, {
+      vim.api.nvim_create_autocmd({ 'BufWritePost' }, {
         group = lint_augroup,
         callback = function()
           lint.try_lint()

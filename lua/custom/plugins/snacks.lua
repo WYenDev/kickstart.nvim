@@ -87,7 +87,9 @@ return {
     {
       '<leader>ff',
       function()
-        Snacks.picker.files()
+        Snacks.picker.files {
+          hidden = true,
+        }
       end,
       desc = 'Find Files',
     },
