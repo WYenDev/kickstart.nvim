@@ -4,9 +4,10 @@ return {
   lazy = false,
   ---@type snacks.Config
   opts = {
+    image = { enabled = true },
     bigfile = { enabled = true },
     dashboard = { enabled = true },
-    explorer = { enabled = true },
+    explorer = { enabled = true, replace_netrw = false },
     indent = { enabled = true },
     input = { enabled = true },
     notifier = {
@@ -44,7 +45,9 @@ return {
     {
       '<leader>/',
       function()
-        Snacks.picker.grep()
+        Snacks.picker.grep {
+          args = { '--case-sensitive' },
+        }
       end,
       desc = 'Grep',
     },
